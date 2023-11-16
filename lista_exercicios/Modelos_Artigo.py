@@ -251,6 +251,19 @@ class Simulacao():
         time_slots = pd.unique(self.entidades.df_entidades['time_slot'])
         self.recursos_est.df_estatisticas_recursos['time_slot'] = self.recursos_est.df_estatisticas_recursos.apply(lambda x: calcula_time_slot(x.T, define_time_slot), axis=1 )
 
+        # GRÁFICOS DE UTILIZAÇÃO
+        fig = px.line(self.recursos_est.df_estatisticas_recursos,
+                      x="T", y="utilizacao", color="recurso", title='Grafico de Utilizacao Total dos Recursos')
+        fig.show()
+
+        for time_s in time_slots:
+            df_recursos = self.recursos_est.df_estatisticas_recursos.loc[
+                self.recursos_est.df_estatisticas_recursos.time_slot == time_s]
+            fig = px.line(df_recursos,
+                          x="T", y="utilizacao", color="recurso",
+                          title=f'Grafico de Utilizacao Total dos Recursos no {time_s}')
+            fig.show()
+
         #GRÁFICOS TEMPO DE FILA
         df_tempo_fila_time_slot = self.entidades.df_entidades.groupby(by=['time_slot']).agg({"tempo_fila":"mean"}).reset_index()
         fig = px.bar(df_tempo_fila_time_slot,x='time_slot', y="tempo_fila", title='Media de tempo em fila por time_slot')
@@ -261,20 +274,7 @@ class Simulacao():
         fig.show()
 
 
-        #GRÁFICOS DE UTILIZAÇÃO
-        fig = px.line(self.recursos_est.df_estatisticas_recursos,
-                      x="T", y="utilizacao", color="recurso", title='Grafico de Utilizacao Total dos Recursos')
-        fig.show()
 
-        for time_s in time_slots:
-            df_recursos = self.recursos_est.df_estatisticas_recursos.loc[self.recursos_est.df_estatisticas_recursos.time_slot == time_s]
-            fig = px.line(df_recursos,
-                          x="T", y="utilizacao", color="recurso", title=f'Grafico de Utilizacao Total dos Recursos no {time_s}')
-            fig.show()
-
-        df_tempo_fila_time_slot = self.entidades.df_entidades.groupby(by=['time_slot']).agg({"tempo_fila":"mean"})
-        fig = px.bar(df_tempo_fila_time_slot,x='time_slot', y="tempo_fila")
-        fig.show()
 
 
 class EstatisticasSistema():
