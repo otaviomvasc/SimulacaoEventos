@@ -284,17 +284,19 @@ class EstatisticasSistema():
         self.WIP = 0
         self.df_estatisticas_simulacao = pd.DataFrame()
         self.entidades_sistema = list()
+        self.df_entidades_brutas = pd.DataFrame()
 
     def fecha_estatisticas(self):
         print(f'Chegadas: {self.chegadas}')
         print(f'Saídas: {self.saidas}')
         print(f'WIP: {self.WIP} ')
-        entidades_sistema = np.mean([v for reg in self.entidades_sistema for v in reg.values()]) #TODO: Verificar como esse cálculo ta sendo feito!!
+        entidades_sistema = np.mean([rec["WIP"] for rec in self.entidades_sistema]) #TODO: Verificar como esse cálculo ta sendo feito!!
         dict_aux = {"Chegadas": self.chegadas,
                     "Saidas": self.saidas,
                     "WIP": self.WIP,
                     "Media_Sistema": entidades_sistema}
 
+        self.df_entidades_brutas = pd.DataFrame(self.entidades_sistema)
         self.df_estatisticas_simulacao = pd.DataFrame([dict_aux])
 
     def computa_chegadas(self, momento):
@@ -302,13 +304,15 @@ class EstatisticasSistema():
         self.chegadas += 1
         self.WIP += 1
         self.entidades_sistema.append({"discretizacao": momento,
-                                       "WIP": self.WIP})
+                                       "WIP": self.WIP,
+                                       "processo": "chegada"})
 
     def computa_saidas(self, momento):
         self.saidas += 1
         self.WIP -= 1
         self.entidades_sistema.append({"discretizacao": momento,
-                                       "WIP": self.WIP})
+                                       "WIP": self.WIP,
+                                       "processo": "saida"})
 
 class Entidades:
     def __init__(self):
@@ -418,14 +422,15 @@ class Recursos:
         b=0
 
 class CorridaSimulacao():
-    def __init__(self, replicacoes, simulacao: Simulacao, duracao_simulacao):
+    def __init__(self, replicacoes, simulacao: Simulacao, duracao_simulacao, periodo_warmup):
         self.replicacoes: int = replicacoes
         self.df_estatisticas_entidades = pd.DataFrame()  #Lista com cada estatística de cada rodada
         self.df_estatisticas_sistema = pd.DataFrame()
         self.df_estatisticas_recursos = pd.DataFrame()
+        self.df_estatistcas_sistemas_brutos = pd.DataFrame()
         self.duracao_simulacao = duracao_simulacao
         self.simulacoes = [deepcopy(simulacao) for i in range(replicacoes)]
-
+        self.periodo_warmup = periodo_warmup
     def roda_simulacao(self):
         for n_sim in range(len(self.simulacoes)):
             print(f'Simulação {n_sim + 1}')
@@ -436,7 +441,6 @@ class CorridaSimulacao():
             simulacao.finaliza_todas_estatisticas()
             if len(self.simulacoes) == 1:
                 simulacao.gera_graficos()
-
 
     def fecha_estatisticas_experimento(self):
         def calc_ic(lista):
@@ -449,36 +453,53 @@ class CorridaSimulacao():
             return h
         #Agrupando os dados
         for n_sim in range(len(self.simulacoes)):
+            #junção dos dados das entidades
             df_entidades = self.simulacoes[n_sim].entidades.df_entidades
+            df_entidades = df_entidades.loc[df_entidades.entra_processo > self.periodo_warmup]
             df_entidades['Replicacao'] = n_sim + 1
+
+
+            #junção dos dados das estatísticas do sistema
             df_sistema = self.simulacoes[n_sim].estatisticas_sistema.df_estatisticas_simulacao
             df_sistema['Replicacao'] = n_sim + 1
+
+            df_sistema_bruto = self.simulacoes[n_sim].estatisticas_sistema.df_entidades_brutas
+            df_sistema_bruto = df_sistema_bruto.loc[df_sistema_bruto.discretizacao > self.periodo_warmup]
+            df_sistema_bruto['Replicacao'] = n_sim + 1
+
+            #junção dos dados das estatísticas dos recursos
             df_recursos = self.simulacoes[n_sim].recursos_est.df_estatisticas_recursos
+            df_recursos = df_recursos.loc[df_recursos['T'] > self.periodo_warmup]
             df_recursos['Replicacao'] = n_sim + 1
+
+
             self.df_estatisticas_entidades = pd.concat([self.df_estatisticas_entidades, df_entidades])
             self.df_estatisticas_sistema = pd.concat([self.df_estatisticas_sistema,df_sistema ])
             self.df_estatisticas_recursos = pd.concat([self.df_estatisticas_recursos, df_recursos])
+            self.df_estatistcas_sistemas_brutos = pd.concat([self.df_estatistcas_sistemas_brutos, df_sistema_bruto])
 
 
-        TS = [ent.saida_sistema - ent.entrada_sistema for sim in self.simulacoes for ent in sim.entidades.lista_entidades]
+        TS = [(ent.saida_sistema - ent.entrada_sistema)/60 for sim in self.simulacoes for ent in sim.entidades.lista_entidades if ent.saida_sistema > 1]
         TA = self.df_estatisticas_entidades['tempo_processando']
         TF = self.df_estatisticas_entidades['tempo_fila']
         NA = self.df_estatisticas_recursos['fila_recurso']
         NF = self.df_estatisticas_recursos['tamanho_fila']
-        NS = [d['WIP'] for sim in self.simulacoes for d in sim.estatisticas_sistema.entidades_sistema ] #TODO: Confirmar esse cálculo!
+        NS = self.df_estatistcas_sistemas_brutos["WIP"]
         USO = self.df_estatisticas_recursos['utilizacao']
 
-        TS_ = np.mean([ent.saida_sistema - ent.entrada_sistema for sim in self.simulacoes for ent in sim.entidades.lista_entidades])
-        TA_ = np.mean(self.df_estatisticas_entidades['tempo_processando'])
-        TF_ = np.mean(self.df_estatisticas_entidades['tempo_fila'])
-        NA_ = np.mean(self.df_estatisticas_recursos['fila_recurso'])
-        NF_ = np.mean(self.df_estatisticas_recursos['tamanho_fila'])
-        NS_ = np.mean([d['WIP'] for sim in self.simulacoes for d in sim.estatisticas_sistema.entidades_sistema ])
-        USO_= np.mean(self.df_estatisticas_recursos['utilizacao'])
+        TS_ = round(np.mean(TS)/60, 2)
+        TA_ = round(np.mean(self.df_estatisticas_entidades['tempo_processando'])/60,2)
+        TF_ = round(np.mean(self.df_estatisticas_entidades['tempo_fila'])/60,2)
+        NA_ = round(np.mean(self.df_estatisticas_recursos['fila_recurso'])/60,2)
+        NF_ = round(np.mean(self.df_estatisticas_recursos['tamanho_fila']),2)
+        NS_ = round(np.mean(self.df_estatistcas_sistemas_brutos["WIP"]), 2)
+        USO_= round(np.mean(self.df_estatisticas_recursos['utilizacao']),2)
 
-        chegadas = np.mean([sim.estatisticas_sistema.chegadas for sim in self.simulacoes])
-        saidas = np.mean([sim.estatisticas_sistema.saidas for sim in self.simulacoes])
-        WIP = np.mean([sim.estatisticas_sistema.WIP for sim in self.simulacoes])
+
+        df_aux = self.df_estatistcas_sistemas_brutos.groupby(by=['processo']).agg({"WIP": "count"}).reset_index()
+        chegadas = list(df_aux.loc[df_aux.processo == "chegada"]["WIP"])[0]
+        saidas = list(df_aux.loc[df_aux.processo == "saida"]["WIP"])[0]
+        WIP = round(np.mean([self.df_estatistcas_sistemas_brutos["WIP"]]))
         print(f'Chegadas: {chegadas} entidades')
         print(f'Saidas:   {saidas} entidades')
         print(f'WIP:      {WIP} entidades')
