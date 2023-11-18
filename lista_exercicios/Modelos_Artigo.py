@@ -480,6 +480,7 @@ class CorridaSimulacao():
 
 
         TS = [(ent.saida_sistema - ent.entrada_sistema)/60 for sim in self.simulacoes for ent in sim.entidades.lista_entidades if ent.saida_sistema > 1]
+        TS2 = [(ent.saida_sistema - ent.entrada_sistema)/60 if ent.saida_sistema > 1 else (self.duracao_simulacao - ent.entrada_sistema) for sim in self.simulacoes for ent in sim.entidades.lista_entidades]
         TA = self.df_estatisticas_entidades['tempo_processando']
         TF = self.df_estatisticas_entidades['tempo_fila']
         NA = self.df_estatisticas_recursos['fila_recurso']
@@ -488,6 +489,7 @@ class CorridaSimulacao():
         USO = self.df_estatisticas_recursos['utilizacao']
 
         TS_ = round(np.mean(TS)/60, 2)
+        TS2_ = round(np.mean(TS2)/60,2)
         TA_ = round(np.mean(self.df_estatisticas_entidades['tempo_processando'])/60,2)
         TF_ = round(np.mean(self.df_estatisticas_entidades['tempo_fila'])/60,2)
         NA_ = round(np.mean(self.df_estatisticas_recursos['fila_recurso'])/60,2)
@@ -514,6 +516,7 @@ class CorridaSimulacao():
         print('NF: {0:.2f} \u00B1 {1:.2f} entidades (IC 95%)'.format(np.mean(NF_), calc_ic(NF)))
         print('NA: {0:.2f} \u00B1 {1:.2f} entidades (IC 95%)'.format(np.mean(NA_), calc_ic(NA)))
         print('TS: {0:.2f} \u00B1 {1:.2f} minutos (IC 95%)'.format(np.mean(TS_), calc_ic(TS)))
+        print('TS: {0:.2f} \u00B1 {1:.2f} minutos (IC 95%) - FORMA DE CÁLCULO CONSIDERANDO WIPS'.format(np.mean(TS2_), calc_ic(TS2)))
         print('TF: {0:.2f} \u00B1 {1:.2f} minutos (IC 95%)'.format(np.mean(TF_), calc_ic(TF)))
         print('TA: {0:.2f} \u00B1 {1:.2f} minutos (IC 95%)'.format(np.mean(TA_), calc_ic(TA)))
         print('USO:{0:.2f}% \u00B1 {1:.2f}%  (IC 95%)'.format(np.mean(USO) * 100, calc_ic(USO) * 100))

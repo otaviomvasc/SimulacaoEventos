@@ -257,7 +257,7 @@ if __name__ == '__main__':
     #simulacao.env.run(until=tempo)
     #b=0
     replicacoes = 5 # corridas * quantidade de dias. Essa é a maneira certa?
-    warmup = tempo * 0.1 #Pensei em criar essa forma como porcentagem por tempo, mas o artigo simula de forma continua e indica o warmup como 13 semanas
+    warmup = 0 #Pensei em criar essa forma como porcentagem por tempo, mas o artigo simula de forma continua e indica o warmup como 13 semanas
     CorridaSimulacao = CorridaSimulacao(
         replicacoes= replicacoes,
         simulacao=simulacao,
