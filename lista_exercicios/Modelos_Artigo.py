@@ -254,6 +254,12 @@ class Simulacao():
         time_slots = pd.unique(self.entidades.df_entidades['time_slot'])
         self.recursos_est.df_estatisticas_recursos['time_slot'] = self.recursos_est.df_estatisticas_recursos.apply(lambda x: calcula_time_slot(x.T, define_time_slot), axis=1 )
 
+        #Graficos de WIP, entrada e saída
+        fig = px.line(self.estatisticas_sistema.df_entidades_brutas,
+                      x="discretizacao", y="WIP", title='Grafico de WIP')
+        fig.show()
+
+
         # GRÁFICOS DE UTILIZAÇÃO
         fig = px.line(self.recursos_est.df_estatisticas_recursos,
                       x="T", y="utilizacao", color="recurso", title='Grafico de Utilizacao Total dos Recursos')
