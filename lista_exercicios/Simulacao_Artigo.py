@@ -218,22 +218,22 @@ if __name__ == '__main__':
 
     distribuicoes_probabilidade = calcula_distribuicoes_probabilidade()
     seed(1)
-    recursos = {"check_in_ultrassom": 5,
-                "check_in_imagem" : 5,
+    recursos = {"check_in_ultrassom": 7,
+                "check_in_imagem" : 4,
                 "Raio-x": 4,
                 "MRI": 6,
                 "CAT": 3,
                 "Mammography": 2,
                 "Ultrasound": 8,
-                "tecnico_Mammography": 1,
-                "tecnico_Raio-x": 3,
-                "assistente_Raio-x": 3,
+                "tecnico_Mammography": 2,
+                "tecnico_Raio-x": 4,
+                "assistente_Raio-x": 4,
                 "tecnico_MRI": 4,
                 "assistente_MRI": 4,
-                "tecnico_CAT": 2,
-                "assistente_CAT": 2,
-                "medico_ultrasound": 6,
-                "assistente_ultrasound": 6
+                "tecnico_CAT": 3,
+                "assistente_CAT": 3,
+                "medico_ultrasound": 8,
+                "assistente_ultrasound": 8
                 }
 
     #TODO: dessa forma só da pra pedir 1 por request. pensar em formas genéricas para quando for necessário mais de 1 recurso

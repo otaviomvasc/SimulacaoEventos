@@ -104,9 +104,11 @@ class Simulacao():
             return next(pr[2] for pr in processos if aleatorio >= pr[0] and aleatorio <= pr[1])
 
         entidade_individual.entra_fila = self.env.now
+
         request = self.recursos[recurso].request()
         #Seize/request
         yield request
+        entidade_individual.processo_atual = recurso
         if self.imprime_detalhes:
             print(f'{self.env.now}: Atendente {recurso} começou o atendimento de {entidade_individual.nome}')
 
@@ -177,6 +179,7 @@ class Simulacao():
         for request in requests_recursos:
             yield request
 
+        entidade_individual.processo_atual = exame
         if self.imprime_detalhes:
             print(f'{self.env.now}:  Entidade: {entidade_individual.nome} começou o Exame{exame}')
 
@@ -273,10 +276,6 @@ class Simulacao():
         fig = px.bar(df_tempo_fila_time_slot_processo,x='time_slot', y="tempo_fila", color='processo', title='Media de tempo em fila por time_slot e por processo')
         fig.show()
 
-
-
-
-
 class EstatisticasSistema():
     def __init__(self):
         self.chegadas = 0
@@ -352,6 +351,7 @@ class Entidade_individual(Entidades):
         self.saida_sistema: float = 0.0
         self.time_slot = None
         self.tempo_sistema = 0
+        self.processo_atual: str
 
     def fecha_ciclo(self, processo):
         if not processo == "saida_sistema":
@@ -401,12 +401,13 @@ class Recursos:
         recurso.tempo_utilizacao_recurso += round(momento - inicio_utilizacao)
         #inicio_utilizacao = request.usage_since
         #TODO: preciso usar o momento ou apenas o fecha_utilizacao_recurso ja tem esse dado, visto que será chamado após processo
-        dict_aux = {"inicia_utilizacao_recurso": inicio_utilizacao,
+        dict_aux = {"recurso": nome_recurso,
+                    "inicia_utilizacao_recurso": inicio_utilizacao,
                     "finaliza_utilizacao_recurso": momento,
                     "tempo_utilizacao_recurso": momento - inicio_utilizacao,
                     "utilizacao": recurso.tempo_utilizacao_recurso/(recurso._capacity * momento),
                     "T": momento,
-                    "fila_recurso": recurso.count,
+                    "em_atendimento": recurso.count,
                     "tamanho_fila": len(recurso.queue)
                     }
 
@@ -483,8 +484,10 @@ class CorridaSimulacao():
         TS2 = [(ent.saida_sistema - ent.entrada_sistema)/60 if ent.saida_sistema > 1 else (self.duracao_simulacao - ent.entrada_sistema) for sim in self.simulacoes for ent in sim.entidades.lista_entidades]
         TA = self.df_estatisticas_entidades['tempo_processando']
         TF = self.df_estatisticas_entidades['tempo_fila']
-        NA = self.df_estatisticas_recursos['fila_recurso']
+        NA = self.df_estatisticas_recursos['em_atendimento']
+        NA2 = self.df_estatisticas_recursos.groupby(by=["recurso"]).agg({'em_atendimento': 'mean'}).reset_index().em_atendimento
         NF = self.df_estatisticas_recursos['tamanho_fila']
+        NF2 = self.df_estatisticas_recursos.groupby(by=["recurso"]).agg({'tamanho_fila': 'mean'}).reset_index().tamanho_fila
         NS = self.df_estatistcas_sistemas_brutos["WIP"]
         USO = self.df_estatisticas_recursos['utilizacao']
 
@@ -492,15 +495,18 @@ class CorridaSimulacao():
         TS2_ = round(np.mean(TS2)/60,2)
         TA_ = round(np.mean(self.df_estatisticas_entidades['tempo_processando'])/60,2)
         TF_ = round(np.mean(self.df_estatisticas_entidades['tempo_fila'])/60,2)
-        NA_ = round(np.mean(self.df_estatisticas_recursos['fila_recurso'])/60,2)
+        NA_ = round(np.mean(self.df_estatisticas_recursos['em_atendimento'])/60,2)
+        NA2_ = round(sum(self.df_estatisticas_recursos.groupby(by=["recurso"]).agg({'em_atendimento': 'mean'}).reset_index().em_atendimento),2)
         NF_ = round(np.mean(self.df_estatisticas_recursos['tamanho_fila']),2)
+        NF2_ = round(sum(self.df_estatisticas_recursos.groupby(by=["recurso"]).agg({'tamanho_fila': 'mean'}).reset_index().tamanho_fila),2)
         NS_ = round(np.mean(self.df_estatistcas_sistemas_brutos["WIP"]), 2)
         USO_= round(np.mean(self.df_estatisticas_recursos['utilizacao']),2)
 
 
-        df_aux = self.df_estatistcas_sistemas_brutos.groupby(by=['processo']).agg({"WIP": "count"}).reset_index()
-        chegadas = list(df_aux.loc[df_aux.processo == "chegada"]["WIP"])[0]
-        saidas = list(df_aux.loc[df_aux.processo == "saida"]["WIP"])[0]
+        df_aux = self.df_estatistcas_sistemas_brutos.groupby(by=['processo', "Replicacao"]).agg({"WIP": "count"}).reset_index()
+        chegadas = np.mean(df_aux.loc[df_aux.processo == 'chegada']['WIP'])
+        saidas = np.mean(df_aux.loc[df_aux.processo == 'saida']['WIP'])
+        df_wip = self.df_estatistcas_sistemas_brutos.groupby(by=["Replicacao"]).agg({"WIP": "mean"}).reset_index()
         WIP = round(np.mean([self.df_estatistcas_sistemas_brutos["WIP"]]))
         print(f'Chegadas: {chegadas} entidades')
         print(f'Saidas:   {saidas} entidades')
@@ -514,7 +520,9 @@ class CorridaSimulacao():
         #TODO: Preciso calcular recursos/entidades por processo ?
         print('NS: {0:.2f} \u00B1 {1:.2f} entidades (IC 95%)'.format(np.mean(NS_), calc_ic(NS)))
         print('NF: {0:.2f} \u00B1 {1:.2f} entidades (IC 95%)'.format(np.mean(NF_), calc_ic(NF)))
+        print('NF: {0:.2f} \u00B1 {1:.2f} entidades (IC 95%) - FORMA DE CÁLCULO 2'.format(np.mean(NF2_), calc_ic(NF2)))
         print('NA: {0:.2f} \u00B1 {1:.2f} entidades (IC 95%)'.format(np.mean(NA_), calc_ic(NA)))
+        print('NA: {0:.2f} \u00B1 {1:.2f} entidades (IC 95%) - FORMA DE CÁLCULO 2'.format(np.mean(NA2_), calc_ic(NA2)))
         print('TS: {0:.2f} \u00B1 {1:.2f} minutos (IC 95%)'.format(np.mean(TS_), calc_ic(TS)))
         print('TS: {0:.2f} \u00B1 {1:.2f} minutos (IC 95%) - FORMA DE CÁLCULO CONSIDERANDO WIPS'.format(np.mean(TS2_), calc_ic(TS2)))
         print('TF: {0:.2f} \u00B1 {1:.2f} minutos (IC 95%)'.format(np.mean(TF_), calc_ic(TF)))
